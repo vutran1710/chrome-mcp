@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Chrome MCP",
+  "version": "0.1.0",
+  "description": "Local MCP bridge for browser automation",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "scripting",
+    "debugger"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
