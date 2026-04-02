@@ -454,3 +454,110 @@ A common workflow to check all messaging apps at once:
 - Use `page_read mode: "accessibility"` as fallback when selectors break
 - Always verify selectors with a quick `page_read` if results are empty — apps update their DOM frequently
 - For sending messages, prefer `document.execCommand('insertText', ...)` over `page_type` for contenteditable editors
+
+---
+
+## am-server Integration
+
+After reading messages from apps via Chrome MCP, push structured data to am-server for persistent storage and later querying.
+
+### am-server API
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/ingest` | Push messages (single or array) |
+| GET | `/api/messages` | List/search messages |
+| GET | `/api/messages/{id}` | Get single message |
+| GET | `/api/stats` | Message counts by source |
+| GET | `/healthz` | Health check |
+
+**Auth:** `X-API-Key` header. Key is in `~/.agent-mesh/config.toml`.
+**Server:** `http://localhost:8090`
+
+### Message schema
+
+```json
+{
+  "id": "optional, auto-generated if omitted",
+  "source": "gmail|discord|zalo|messenger|slack",
+  "sender": "Display Name",
+  "subject": "Email subject or chat name",
+  "preview": "First ~100 chars of message content",
+  "raw": {},
+  "source_ts": "2026-04-02T10:00:00Z"
+}
+```
+
+Accepts a single object or an array. Duplicate IDs are ignored.
+
+### Workflow: Read apps and push to am-server
+
+After reading messages from each app, push them to am-server using `curl` or `fetch`:
+
+```bash
+# Push Gmail messages
+curl -s -X POST http://localhost:8090/ingest \
+  -H "X-API-Key: $AM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '[
+    {"source": "gmail", "sender": "Vu Tran", "subject": "CI failed", "preview": "Rebuild Index failed..."},
+    {"source": "gmail", "sender": "Google", "subject": "Security alert", "preview": "New sign-in on Mac..."}
+  ]'
+
+# Push Discord messages
+curl -s -X POST http://localhost:8090/ingest \
+  -H "X-API-Key: $AM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '[
+    {"source": "discord", "sender": "Bruno", "subject": "DM", "preview": "how are you"}
+  ]'
+
+# Push Zalo messages
+curl -s -X POST http://localhost:8090/ingest \
+  -H "X-API-Key: $AM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '[
+    {"source": "zalo", "sender": "Tuấn Anh", "subject": "1Chat", "preview": "anh cần rửa 2-3tr..."}
+  ]'
+```
+
+### Query messages later
+
+```bash
+# Get all unread from Gmail
+curl -s "http://localhost:8090/api/messages?source=gmail" \
+  -H "X-API-Key: $AM_API_KEY"
+
+# Search across all sources
+curl -s "http://localhost:8090/api/messages?q=security+alert" \
+  -H "X-API-Key: $AM_API_KEY"
+
+# Messages since a specific time
+curl -s "http://localhost:8090/api/messages?since=2026-04-02T00:00:00Z" \
+  -H "X-API-Key: $AM_API_KEY"
+
+# Stats by source
+curl -s "http://localhost:8090/api/stats" \
+  -H "X-API-Key: $AM_API_KEY"
+```
+
+### Full scheduled workflow
+
+When Claude Code runs on a schedule (e.g., every 30 minutes):
+
+```
+1. Read AM_API_KEY from ~/.agent-mesh/config.toml
+
+2. For each app (Gmail, Discord, Zalo, Messenger, Slack):
+   a. Use Chrome MCP to navigate and read messages
+   b. Structure results as am-server messages
+   c. POST to /ingest
+
+3. Optionally summarize what's new and alert the user
+```
+
+This way:
+- **Chrome MCP** handles the browser automation (reading, replying)
+- **am-server** stores the structured message history
+- **Claude Code** orchestrates both, runs on schedule, and can reason about messages
+- **You** can query am-server anytime without Claude running
