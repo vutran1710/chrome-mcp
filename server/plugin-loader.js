@@ -118,10 +118,11 @@ export class PluginLoader {
     if (!plugin) throw new Error(`Plugin not found: ${pluginName}`);
 
     this.setState(pluginName, { state: "initializing", message: null });
+    bridge.notify("plugin_status", { plugin: pluginName, state: "initializing" });
 
     if (!plugin.init) {
-      // No init method — mark ready immediately
       this.setState(pluginName, { state: "ready" });
+      bridge.notify("plugin_status", { plugin: pluginName, state: "ready" });
       return { ready: true };
     }
 
@@ -130,21 +131,17 @@ export class PluginLoader {
 
       if (result && result.loggedIn) {
         this.setState(pluginName, { state: "ready" });
+        bridge.notify("plugin_status", { plugin: pluginName, state: "ready" });
         return { ready: true };
       }
 
       const message = result?.message || `Please log in to ${pluginName}`;
       this.setState(pluginName, { state: "awaiting_login", message });
-
-      bridge.notify("plugin_status", {
-        plugin: pluginName,
-        state: "awaiting_login",
-        message,
-      });
-
+      bridge.notify("plugin_status", { plugin: pluginName, state: "awaiting_login", message });
       return { awaiting_login: true, message };
     } catch (err) {
       this.setState(pluginName, { state: "error", message: err.message });
+      bridge.notify("plugin_status", { plugin: pluginName, state: "error", message: err.message });
       return { error: err.message };
     }
   }

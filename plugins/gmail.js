@@ -9,7 +9,8 @@ export default {
     await sleep(3000);
     const result = await evaluate(bridge, tabId, `
       (() => {
-        if (document.title.includes('Inbox') || document.title.includes('Gmail')) {
+        // Must be on mail.google.com with actual inbox loaded
+        if (location.hostname === 'mail.google.com' && document.title.includes('Inbox')) {
           return { loggedIn: true };
         }
         return { loggedIn: false, message: "Please log in to Gmail" };
@@ -20,7 +21,7 @@ export default {
 
   tools: {
     list_emails: {
-      description: "List inbox emails with sender, subject, snippet, and unread status",
+      description: "List inbox emails with sender, subject, snippet, date, and unread status",
       async handler(bridge) {
         const tabId = await ensureTab(bridge, "https://mail.google.com");
         await sleep(1000);
@@ -28,13 +29,18 @@ export default {
           (() => {
             const rows = document.querySelectorAll('tr.zA');
             const emails = [];
-            rows.forEach((row, i) => {
+            rows.forEach(row => {
+              const senderEl = row.querySelector('.yW .zF, .yW .yP');
+              const snippet = (row.querySelector('.y2')?.textContent?.trim() || '').replace(/^-\\s*/, '').replace(/^- /, '');
               emails.push({
-                index: i,
-                unread: row.classList.contains('zE'),
-                sender: (row.querySelector('.yW .zF, .yW .yP')?.getAttribute('name')) || '',
+                sender: senderEl?.getAttribute('name') || '',
+                email: senderEl?.getAttribute('email') || '',
                 subject: row.querySelector('.bog')?.textContent?.trim() || '',
-                snippet: row.querySelector('.y2')?.textContent?.trim()?.slice(0, 100) || '',
+                snippet: snippet,
+                date: row.querySelector('.xW span')?.getAttribute('title') || '',
+                unread: row.classList.contains('zE'),
+                starred: !!row.querySelector('.T-KT-Jp'),
+                hasAttachment: !!row.querySelector('.yf img, .brd'),
               });
             });
             return emails;

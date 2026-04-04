@@ -449,6 +449,9 @@ chrome.runtime.onMessage.addListener((msg) => {
   }
 });
 
+// Open side panel on extension icon click
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+
 // Connect on startup
 connect();
 

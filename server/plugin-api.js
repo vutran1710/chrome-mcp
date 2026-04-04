@@ -41,11 +41,12 @@ export function registerPluginTools(server, loader, scheduler, bridge, onJobResu
     {
       plugin: z.string().describe("Plugin name"),
       tool: z.string().describe("Tool name"),
-      params: z.record(z.any()).optional().describe("Tool parameters"),
+      params: z.string().optional().describe("Tool parameters as JSON string"),
     },
     async ({ plugin, tool, params }) => {
       const handler = loader.getHandler(plugin, tool);
-      const result = await handler(bridge, params || {});
+      const parsed = params ? JSON.parse(params) : {};
+      const result = await handler(bridge, parsed);
       return ok(result);
     }
   );
@@ -56,11 +57,12 @@ export function registerPluginTools(server, loader, scheduler, bridge, onJobResu
     {
       plugin: z.string().describe("Plugin name"),
       tool: z.string().describe("Tool name"),
-      params: z.record(z.any()).optional().describe("Tool parameters"),
+      params: z.string().optional().describe("Tool parameters as JSON string"),
     },
     async ({ plugin, tool, params }) => {
       const handler = loader.getHandler(plugin, tool);
-      const result = await handler(bridge, params || {});
+      const parsed = params ? JSON.parse(params) : {};
+      const result = await handler(bridge, parsed);
       return ok(result);
     }
   );
@@ -73,11 +75,12 @@ export function registerPluginTools(server, loader, scheduler, bridge, onJobResu
       tool: z.string().describe("Tool name"),
       type: z.enum(["interval", "timeout"]).describe("Job type"),
       ms: z.number().describe("Interval or delay in milliseconds"),
-      params: z.record(z.any()).optional().describe("Tool parameters"),
+      params: z.string().optional().describe("Tool parameters as JSON string"),
     },
     async ({ plugin, tool, type, ms, params }) => {
       const handler = loader.getHandler(plugin, tool);
-      const fn = () => handler(bridge, params || {});
+      const parsed = params ? JSON.parse(params) : {};
+      const fn = () => handler(bridge, parsed);
       const id = scheduler.create(plugin, tool, type, ms, fn, onJobResult);
       return ok({ id });
     }
