@@ -9,7 +9,7 @@ export default {
     await sleep(3000);
     return evaluate(bridge, tabId, `
       (() => {
-        if (location.hostname === 'mail.google.com' && document.title.includes('Inbox')) {
+        if (location.hostname === 'mail.google.com' && location.hash.includes('#')) {
           return { loggedIn: true };
         }
         return { loggedIn: false, message: "Please log in to Gmail" };
@@ -98,6 +98,75 @@ export default {
         `);
 
         return { type: "json", data: email, metadata: {} };
+      },
+    },
+
+    get_unread: {
+      description: "Get all unread emails with full content. Scans inbox, opens each unread email, reads it, returns array",
+      async handler(bridge) {
+        const tabId = await ensureTab(bridge, "https://mail.google.com");
+        await sleep(1000);
+
+        // Get count of unread emails
+        const unreadCount = await evaluate(bridge, tabId, `
+          document.querySelectorAll('tr.zA.zE').length
+        `);
+
+        if (!unreadCount) {
+          return { type: "json", data: [], metadata: { count: 0 } };
+        }
+
+        const emails = [];
+        for (let i = 0; i < unreadCount; i++) {
+          // Click the i-th unread row
+          const clicked = await evaluate(bridge, tabId, `
+            (() => {
+              const unreadRows = document.querySelectorAll('tr.zA.zE');
+              const row = unreadRows[${i}];
+              if (!row) return false;
+              const el = row.querySelector('.bog span, .bqe');
+              if (el) el.click();
+              else row.click();
+              return true;
+            })()
+          `);
+
+          if (!clicked) break;
+          await sleep(2000);
+
+          // Read content
+          const email = await evaluate(bridge, tabId, `
+            (() => {
+              const body = document.querySelector('.a3s.aiL, .ii.gt');
+              const content = body?.innerText?.trim() || '';
+              return {
+                subject: document.querySelector('h2.hP')?.textContent?.trim() || '',
+                sender: document.querySelector('.gD')?.getAttribute('name') || '',
+                email: document.querySelector('.gD')?.getAttribute('email') || '',
+                date: document.querySelector('.g3')?.textContent?.trim() || '',
+                content: content.slice(0, 3000),
+              };
+            })()
+          `);
+
+          if (email) emails.push(email);
+
+          // Go back to inbox
+          await evaluate(bridge, tabId, `
+            (() => {
+              const back = document.querySelector('[aria-label="Go back"], [aria-label="Back to Inbox"]');
+              if (back) back.click();
+              else location.hash = '#inbox';
+            })()
+          `);
+          await sleep(1500);
+        }
+
+        return {
+          type: "json",
+          data: emails,
+          metadata: { count: emails.length },
+        };
       },
     },
 
