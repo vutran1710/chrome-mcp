@@ -18,13 +18,14 @@ const mockPlugin = {
     fetch_data: {
       description: "Fetch some data",
       async handler(bridge, params) {
-        return { items: [1, 2, 3], filter: params.filter || "all" };
+        const items = [1, 2, 3];
+        return { type: "json", data: { items, filter: params.filter || "all" }, metadata: { count: 3 } };
       },
     },
     do_action: {
       description: "Perform an action",
       async handler(bridge, params) {
-        return { ok: true, action: params.action };
+        return { type: "json", data: { ok: true, action: params.action }, metadata: {} };
       },
     },
   },
@@ -43,7 +44,8 @@ describe("Plugin API integration", () => {
     await loader.initPlugin("mock", mockBridge);
     const handler = loader.getHandler("mock", "fetch_data");
     const result = await handler(mockBridge, { filter: "unread" });
-    assert.deepStrictEqual(result, { items: [1, 2, 3], filter: "unread" });
+    assert.strictEqual(result.type, "json");
+    assert.deepStrictEqual(result.data, { items: [1, 2, 3], filter: "unread" });
   });
 
   it("post calls plugin handler and returns result", async () => {
@@ -52,7 +54,8 @@ describe("Plugin API integration", () => {
     await loader.initPlugin("mock", mockBridge);
     const handler = loader.getHandler("mock", "do_action");
     const result = await handler(mockBridge, { action: "delete" });
-    assert.deepStrictEqual(result, { ok: true, action: "delete" });
+    assert.strictEqual(result.type, "json");
+    assert.deepStrictEqual(result.data, { ok: true, action: "delete" });
   });
 
   it("create_job schedules and runs plugin handler", async () => {
@@ -70,7 +73,8 @@ describe("Plugin API integration", () => {
 
     await sleep(100);
     assert.ok(captured);
-    assert.deepStrictEqual(captured.result, { items: [1, 2, 3], filter: "all" });
+    assert.strictEqual(captured.result.type, "json");
+    assert.deepStrictEqual(captured.result.data, { items: [1, 2, 3], filter: "all" });
     assert.strictEqual(captured.info.plugin, "mock");
   });
 
@@ -108,7 +112,7 @@ describe("Plugin API integration", () => {
     // Get
     const handler = loader.getHandler("mock", "fetch_data");
     const data = await handler(mockBridge, {});
-    assert.ok(data.items);
+    assert.ok(data.data.items);
 
     // Create job
     const fn = () => handler(mockBridge, {});

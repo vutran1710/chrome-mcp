@@ -12,13 +12,13 @@ const mockPlugin = {
     list_items: {
       description: "List items",
       async handler(bridge, params) {
-        return [{ id: 1, name: "item1" }];
+        return { type: "json", data: [{ id: 1, name: "item1" }], metadata: {} };
       },
     },
     create_item: {
       description: "Create an item",
       async handler(bridge, params) {
-        return { ok: true, name: params.name };
+        return { type: "json", data: { ok: true, name: params.name }, metadata: {} };
       },
     },
   },
@@ -59,7 +59,8 @@ describe("PluginLoader", () => {
     await loader.initPlugin("test-plugin", mockBridge);
     const handler = loader.getHandler("test-plugin", "list_items");
     const result = await handler(null, {});
-    assert.deepStrictEqual(result, [{ id: 1, name: "item1" }]);
+    assert.strictEqual(result.type, "json");
+    assert.deepStrictEqual(result.data, [{ id: 1, name: "item1" }]);
   });
 
   it("passes params to handler", async () => {
@@ -68,7 +69,8 @@ describe("PluginLoader", () => {
     await loader.initPlugin("test-plugin", mockBridge);
     const handler = loader.getHandler("test-plugin", "create_item");
     const result = await handler(null, { name: "foo" });
-    assert.deepStrictEqual(result, { ok: true, name: "foo" });
+    assert.strictEqual(result.type, "json");
+    assert.deepStrictEqual(result.data, { ok: true, name: "foo" });
   });
 
   it("throws if plugin not ready", () => {

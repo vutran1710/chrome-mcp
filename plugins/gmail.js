@@ -7,16 +7,14 @@ export default {
   async init(bridge) {
     const tabId = await ensureTab(bridge, "https://mail.google.com");
     await sleep(3000);
-    const result = await evaluate(bridge, tabId, `
+    return evaluate(bridge, tabId, `
       (() => {
-        // Must be on mail.google.com with actual inbox loaded
         if (location.hostname === 'mail.google.com' && document.title.includes('Inbox')) {
           return { loggedIn: true };
         }
         return { loggedIn: false, message: "Please log in to Gmail" };
       })()
     `);
-    return result;
   },
 
   tools: {
@@ -25,7 +23,7 @@ export default {
       async handler(bridge) {
         const tabId = await ensureTab(bridge, "https://mail.google.com");
         await sleep(1000);
-        return evaluate(bridge, tabId, `
+        const emails = await evaluate(bridge, tabId, `
           (() => {
             const rows = document.querySelectorAll('tr.zA');
             const emails = [];
@@ -36,7 +34,7 @@ export default {
                 sender: senderEl?.getAttribute('name') || '',
                 email: senderEl?.getAttribute('email') || '',
                 subject: row.querySelector('.bog')?.textContent?.trim() || '',
-                snippet: snippet,
+                snippet,
                 date: row.querySelector('.xW span')?.getAttribute('title') || '',
                 unread: row.classList.contains('zE'),
                 starred: !!row.querySelector('.T-KT-Jp'),
@@ -46,6 +44,12 @@ export default {
             return emails;
           })()
         `);
+        const items = emails || [];
+        return {
+          type: "json",
+          data: items,
+          metadata: { count: items.length, unread: items.filter(e => e.unread).length },
+        };
       },
     },
 
@@ -54,7 +58,7 @@ export default {
       async handler(bridge, params) {
         const tabId = await ensureTab(bridge, "https://mail.google.com");
         const senders = JSON.stringify(params.senders || []);
-        return realClick(bridge, tabId, `
+        const selected = await realClick(bridge, tabId, `
           const targetSenders = ${senders};
           const rows = document.querySelectorAll('tr.zA');
           let selected = 0;
@@ -66,8 +70,9 @@ export default {
               if (checkbox) { realClick(checkbox); selected++; }
             }
           });
-          return { selected };
+          return selected;
         `);
+        return { type: "json", data: { selected }, metadata: {} };
       },
     },
 
@@ -75,13 +80,14 @@ export default {
       description: "Select all visible emails",
       async handler(bridge) {
         const tabId = await ensureTab(bridge, "https://mail.google.com");
-        return realClick(bridge, tabId, `
+        await realClick(bridge, tabId, `
           const selectAll = document.querySelector('span[role="checkbox"]');
           if (selectAll && selectAll.getAttribute('aria-checked') !== 'true') {
             realClick(selectAll);
           }
-          return { checked: selectAll?.getAttribute('aria-checked') };
+          return true;
         `);
+        return { type: "text", data: "done", metadata: {} };
       },
     },
 
@@ -89,16 +95,17 @@ export default {
       description: "Mark selected emails as read",
       async handler(bridge) {
         const tabId = await ensureTab(bridge, "https://mail.google.com");
-        return realClick(bridge, tabId, `
+        await realClick(bridge, tabId, `
           const allBtns = document.querySelectorAll('[role="button"]');
           for (const btn of allBtns) {
             if (btn.getAttribute('aria-label') === 'Mark as read') {
               realClick(btn);
-              return { ok: true };
+              return true;
             }
           }
-          return { error: 'Mark as read button not found' };
+          return false;
         `);
+        return { type: "text", data: "done", metadata: {} };
       },
     },
 
@@ -106,16 +113,17 @@ export default {
       description: "Delete selected emails",
       async handler(bridge) {
         const tabId = await ensureTab(bridge, "https://mail.google.com");
-        return realClick(bridge, tabId, `
+        await realClick(bridge, tabId, `
           const allBtns = document.querySelectorAll('[role="button"]');
           for (const btn of allBtns) {
             if (btn.getAttribute('aria-label') === 'Delete') {
               realClick(btn);
-              return { ok: true };
+              return true;
             }
           }
-          return { error: 'Delete button not found' };
+          return false;
         `);
+        return { type: "text", data: "done", metadata: {} };
       },
     },
 
@@ -123,16 +131,17 @@ export default {
       description: "Archive selected emails",
       async handler(bridge) {
         const tabId = await ensureTab(bridge, "https://mail.google.com");
-        return realClick(bridge, tabId, `
+        await realClick(bridge, tabId, `
           const allBtns = document.querySelectorAll('[role="button"]');
           for (const btn of allBtns) {
             if (btn.getAttribute('aria-label') === 'Archive') {
               realClick(btn);
-              return { ok: true };
+              return true;
             }
           }
-          return { error: 'Archive button not found' };
+          return false;
         `);
+        return { type: "text", data: "done", metadata: {} };
       },
     },
   },
